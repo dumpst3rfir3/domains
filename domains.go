@@ -1,16 +1,44 @@
 package domains
 
-type store []string
+import (
+	"os"
+	"slices"
+	"strings"
 
-func (s *store) Add(domain string) {
-	*s = append(*s, domain)
+	"golang.org/x/exp/maps"
+)
+
+var storefile string = "./store.txt"
+
+type store struct {
+	domains map[string]struct{}
+}
+
+func (s *store) Add(domain string) error {
+	s.domains[domain] = struct{}{}
+	return os.WriteFile(storefile, []byte(strings.Join(s.List(), "\n")), 0o644)
 }
 
 func (s store) List() []string {
-	return s
+	keys := maps.Keys(s.domains)
+	slices.Sort(keys)
+	return keys
 }
 
 func NewStore() *store {
 	var s store
+	s.domains = map[string]struct{}{}
+	bytes, err := os.ReadFile(storefile)
+	if err != nil {
+		return &s
+	}
+	for _, domain := range strings.Split(string(bytes), "\n") {
+		s.domains[domain] = struct{}{}
+	}
 	return &s
+}
+
+func (s *store) Remove(domain string) error {
+	delete(s.domains, domain)
+	return os.WriteFile(storefile, []byte(strings.Join(s.List(), "\n")), 0o644)
 }
