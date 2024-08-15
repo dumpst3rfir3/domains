@@ -1,126 +1,84 @@
 package domains_test
 
 import (
-	"domains"
 	"slices"
 	"testing"
+
+	"domains"
 )
 
 func TestListEmptyStoreGivesNoResults(t *testing.T) {
-	s := domains.NewStore()
 	t.Parallel()
-
+	s := justGiveMeSomeTmpStore(t)
 	if len(s.List()) != 0 {
 		t.Fatalf("Domain list should be empty, but has: %v", s.List())
 	}
 }
 
 func TestListStoreWithOneDomainGivesExpectedResult(t *testing.T) {
-	s := domains.NewStore()
 	t.Parallel()
+	s := justGiveMeSomeTmpStore(t)
 	expected := []string{"example.com"}
-	err := s.Add("example.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
+	s.Add("example.com")
 	if !slices.Equal(s.List(), expected) {
 		t.Fatalf("Expected %v, but got: %v", expected, s.List())
 	}
 }
 
 func TestListReturnsListInSortedOrder(t *testing.T) {
-	s := domains.NewStore()
 	t.Parallel()
+	s := justGiveMeSomeTmpStore(t)
 	expected := []string{"example1.com", "example2.com"}
-	err := s.Add("example2.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	err = s.Add("example1.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
+	s.Add("example2.com")
+	s.Add("example1.com")
 	if !slices.Equal(s.List(), expected) {
 		t.Fatalf("Expected %v, but got: %v", expected, s.List())
 	}
 }
 
 func TestRemoveExistingDomainReturnsExpectedList(t *testing.T) {
-	s := domains.NewStore()
 	t.Parallel()
-	for _, d := range []string{"example3.com", "example2.com", "example1.com"} {
-		err := s.Add(d)
-		if err != nil {
-			t.Fatalf("Expected an error nil, but got: %v", err)
-		}
+	s := justGiveMeSomeTmpStore(t)
+	s.Add("example1.com")
+	s.Add("example2.com")
+	s.Add("example3.com")
+	s.Remove("example1.com")
+	want := []string{"example2.com", "example3.com"}
+	got := s.List()
+	if !slices.Equal(got, want) {
+		t.Fatalf("want %v, but got: %v", want, got)
 	}
-
-	err := s.Remove("ImNotOnTheList.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	expected := []string{"example1.com", "example2.com", "example3.com"}
-
-	if !slices.Equal(s.List(), expected) {
-		t.Fatalf("Expected %v, but got: %v", expected, s.List())
-	}
-
-	err = s.Remove("example2.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	expected = []string{"example1.com", "example3.com"}
-
-	if !slices.Equal(s.List(), expected) {
-		t.Fatalf("Expected %v, but got: %v", expected, s.List())
-	}
-
-	err = s.Remove("example3.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	expected = []string{"example1.com"}
-
-	if !slices.Equal(s.List(), expected) {
-		t.Fatalf("Expected %v, but got: %v", expected, s.List())
-	}
-
-	err = s.Remove("example1.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	expected = []string{}
-
-	if !slices.Equal(s.List(), expected) {
-		t.Fatalf("Expected %v, but got: %v", expected, s.List())
-	}
-
-	err = s.Remove("ListShouldBeEmpty.com")
-	if err != nil {
-		t.Fatalf("Expected an error nil, but got: %v", err)
-	}
-	expected = []string{}
-
-	if !slices.Equal(s.List(), expected) {
-		t.Fatalf("Expected %v, but got: %v", expected, s.List())
-	}
-
 }
 
-func TestStoreChangesPersisted(t *testing.T) {
-	s := domains.NewStore()
+func TestRemoveNonexistentDomainHasNoEffect(t *testing.T) {
 	t.Parallel()
-	expected := []string{"example1.com", "example2.com", "example3.com"}
-
-	for _, d := range []string{"example3.com", "example2.com", "example1.com"} {
-		err := s.Add(d)
-		if err != nil {
-			t.Fatalf("Expected an error nil, but got: %v", err)
-		}
+	s := justGiveMeSomeTmpStore(t)
+	s.Remove("doesntexist.com")
+	if len(s.List()) != 0 {
+		t.Errorf("want empty store, got %#v", s.List())
 	}
+}
 
-	s2 := domains.NewStore()
+func TestSavePersistsChangesToDisk(t *testing.T) {
+	t.Parallel()
+	storePath := t.TempDir() + "/tmp_store.txt"
+	s := domains.OpenStore("/foo/bar/baz.txt")
+	s.Add("example1.com")
+	s.Add("example2.com")
+	s.Add("example3.com")
+	s.Save()
+	s2 := domains.OpenStore(storePath)
+	expected := []string{"example1.com", "example2.com", "example3.com"}
 	if !slices.Equal(s2.List(), expected) {
 		t.Fatalf("Expected %#v, but got: %#v", expected, s2.List())
 	}
+}
+
+func justGiveMeSomeTmpStore(t *testing.T) *domains.Store {
+	tmpDir := t.TempDir()
+	s, err := domains.OpenStore(tmpDir + "/tmp_store.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
 }

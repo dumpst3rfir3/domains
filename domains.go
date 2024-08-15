@@ -10,25 +10,25 @@ import (
 
 var storefile string = "./store.txt"
 
-type store struct {
+type Store struct {
 	domains map[string]struct{}
 }
 
-func (s *store) Add(domain string) error {
+func (s *Store) Add(domain string) error {
 	s.domains[domain] = struct{}{}
 	return os.WriteFile(storefile, []byte(strings.Join(s.List(), "\n")), 0o644)
 }
 
-func (s store) List() []string {
+func (s Store) List() []string {
 	keys := maps.Keys(s.domains)
 	slices.Sort(keys)
 	return keys
 }
 
-func NewStore() *store {
-	var s store
+func OpenStore(path string) *Store {
+	var s Store
 	s.domains = map[string]struct{}{}
-	bytes, err := os.ReadFile(storefile)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return &s
 	}
@@ -38,7 +38,7 @@ func NewStore() *store {
 	return &s
 }
 
-func (s *store) Remove(domain string) error {
+func (s *Store) Remove(domain string) error {
 	delete(s.domains, domain)
 	return os.WriteFile(storefile, []byte(strings.Join(s.List(), "\n")), 0o644)
 }
